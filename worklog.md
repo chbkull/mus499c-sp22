@@ -17,3 +17,7 @@ An interesting way to put it is, prior to clean up, the `SoundLibrary` folder wa
 ## 2/1
 
 Not added to the repository yet, but I took Prof. Fieldsteel's code that unpacks a library into an event and quickly plays through all of the different sounds. The ones that caught my attention today were the "resonator" samples from my Swell bottle. Clear fundamental with relatively clean harmonics, so a basic sound. As a refresher to get back into SuperCollider, I set up a simple SynthDef and Pbind to just play through the sample with varied random parameters. The work is located in `chimes.scd`.
+
+## 2/3
+
+Went back and recorded three more objects: a plastic Rinse-Aid bottle, a big metal bowl, and a small metal bowl (I was inspired by Prof. Fieldsteel's water warbling effect that I decided to try and record some for my self as well). The recordings can be found in the `SoundLibrary` folder.
