@@ -19,17 +19,13 @@ x.free;
 // Planning on bringing it to class today to try and troubleshoot, see if this is even possible or if there are any workarounds
 
 (
-var filtfreqs=[110, 220, 440]
-)
-
-(
 SynthDef.new(\sampleKlank, {
 	arg buf=0, filtfreqs=[110, 220, 440], filtamps=[0.2, 0.2, 0.2], ringtimes=[1.0, 1.0, 1.0], out=0;
 	var sig;
 	sig = DynKlank.ar(
-		`[filtfreqs, filtamps, ringtimes],
+		// `[filtfreqs, filtamps, ringtimes],
 		// `[filtfreqs, filtamps, [1.0, 1.0, 1.0]],
-		// `[[110, 220, 440], [0.2, 0.2, 0.2], [1.0, 1.0, 1.0]],
+		`[[110, 220, 440], [0.2, 0.2, 0.2], [1.0, 1.0, 1.0]],
 		PlayBuf.ar(2, buf, loop:1) * 0.005,
 	);
 	Out.ar(out, sig);
@@ -65,7 +61,7 @@ SynthDef.new(\sampleKlank2, {
 )
 
 
-x = Synth(\sampleKlank2, [\buf, b, \rate, rrand(-12, 12).midiratio, \spos, rrand(0, b.numFrames-1), \atk, 5, \sus, 10, \rel, 10]);
+x = Synth(\sampleKlank2, [\buf, ~buf[1], \rate, rrand(-12, 12).midiratio, \spos, rrand(0, ~buf[1].numFrames-1), \atk, 5, \sus, 10, \rel, 10]);
 x.free;
 
 (
