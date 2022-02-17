@@ -2,6 +2,7 @@ s.boot;
 
 Buffer.freeAll;
 
+
 (
 var audiopath;
 audiopath = PathName(thisProcess.nowExecutingPath).parentPath ++ "../SoundLibrary/Cafe";
@@ -18,10 +19,13 @@ x.free;
 // CK: another oddity of DynKlank- seems to be expecting at least an array of size 2 or more otherwise it gets confused when it tries to call 'sum'.
 
 (
+var maxresonators = 25;
+~fMinorPentatonic = (Scale.minorPentatonic.degrees +.x [41, 53, 65, 77, 89]).midicps.sort.reverse;
+
 SynthDef.new(\sampleKlank, {
 	var buf = \buf.kr(0), rate = \rate.kr(1), spos = \spos.kr(0);
-	var klankfreqs = \klankfreqs.kr(0!25), klankamps = \klankamps.kr(0!25), ringtimes = \ringtimes.kr(0!25);
-	var freqscale = \freqscale.kr(1.0), freqoffset = \freqoffset.kr(0.0), decayscale = \decayscale.kr(1.0);
+	var klankfreqs = \klankfreqs.kr(0!maxresonators), klankamps = \klankamps.kr(0!maxresonators), ringtimes = \ringtimes.kr(0!maxresonators);
+	var freqscale = \freqscale.kr(1.0, \freqscalelag.kr(1.0)), freqoffset = \freqoffset.kr(0.0, \freqoffsetlag.kr(1.0)), decayscale = \decayscale.kr(1.0);
 	var atk = \atk.kr(0.1), sus = \sus.kr(1.0), rel = \rel.kr(0.1);
 	var pan = \pan.kr(0), amp = \amp.kr(1.0), out = \out.kr(0);
 	var sig, env;
@@ -30,24 +34,22 @@ SynthDef.new(\sampleKlank, {
 		PlayBuf.ar(2, buf, BufRateScale.ir(buf) * rate, startPos: spos) * 0.01,
 		freqscale.value,
 		freqoffset,
-		decayscale
+		VarLag.kr(decayscale, \decayscalelag.kr(1.0), \decayscalecurve.kr(0))
 	);
-	env = EnvGen.ar(
-		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
-		doneAction:2
-	);
+	env = Env.linen(atk, sus, rel).ar(Done.freeSelf);
 	sig = sig * env;
 	sig = Balance2.ar(sig[0], sig[1], pan, amp);
 	Out.ar(out, sig);
 }).add;
 )
 
-x = Synth(\sampleKlank, [\buf, ~buf[0], \klankfreqs, #[440], \klankamps, #[0.2], \ringtimes, #[0.6], \atk, 1, \sus, 5, \rel, 1, \amp, 0.5]);
+x = Synth(\sampleKlank, [\buf, ~buf[0], \klankfreqs, [440], \klankamps, [0.2], \ringtimes, [0.6], \atk, 1, \sus, 5, \rel, 1, \amp, 0.5]);
 x.free;
 
+// Pbind from last week using the new SynthDef
 (
 var p1;
-var fMinorPentatonic = Scale.minorPentatonic.degrees +.x [41, 53, 65, 77, 89];
+var klankfreqs = ~fMinorPentatonic;
 p1 = Pbind(
 	\instrument, \sampleKlank,
 	#[\buf, \spos], Pfunc({
@@ -55,9 +57,10 @@ p1 = Pbind(
 		[buf, rrand(0, buf.numFrames - 1)];
 	}),
 	\rate, Pgauss(0.0, 3.0),
-	\klankfreqs, [fMinorPentatonic.midicps.sort.reverse],
-	\klankamps, [Array.exprand(fMinorPentatonic.size, 0.2, 0.3).sort.reverse],
-	\ringtimes, [Array.exprand(fMinorPentatonic.size, 0.6, 2).sort.reverse],
+	// need to wrap DynKlank ref array arguments in arrays so they spawn as just one unified event
+	\klankfreqs, [klankfreqs],
+	\klankamps, [Array.exprand(klankfreqs.size, 0.2, 0.3).sort.reverse],
+	\ringtimes, [Array.exprand(klankfreqs.size, 0.6, 2).sort.reverse],
 	\freqscale, Pwrand([1.0, 1.5], [0.8, 0.2], inf),
 	\decayscale, Pmeanrand(0.5, 1.5),
 	\atk, Pexprand(2.5, 10),
@@ -66,6 +69,162 @@ p1 = Pbind(
 	\dur, 2.5,
 	\pan, Pwhite(-0.5, 0.5),
 	\amp, 0.6,
+);
+
+~stream = p1.play;
+)
+
+~stream.stop;
+
+// baseline
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 5.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+// reversed -> has more "swishing"
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, -1.0, \spos, ~buf[0].numFrames - 1,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 5.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+// sped up -> voices add a jittery texture
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 3.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 5.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+// long ringtimes -> more sustained, chord-like
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 10, 20).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 5.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+// short ringtimes -> sample "leaks" through in addition to sparce pitch content
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.6, 0.8).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.05, 0.4).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 5.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+// higher freqscale multiplies resonator frequencies appropriately
+// lagging freqscale allows for a cool record slow-down effect
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 4.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 10.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+x.set(\freqscale, 1.0, \freqscalelag, 2.0);
+
+
+// higher freqoffset raises resonator frequencies appropriately
+// changing freqoffset has a detune effect
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 1.0,
+	\atk, 2.5, \sus, 10.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+x.set(\freqoffset, 100, \freqoffsetlag, 5.0);
+
+
+// changing decayscale is equivalent to changing ringtimes multiplicatively
+// allows for a nice transition from raw sample to resonators
+(
+x = Synth(\sampleKlank, [
+	\buf, ~buf[0], \rate, 1.0, \spos, 0,
+	\klankfreqs, ~fMinorPentatonic,
+	\klankamps, Array.exprand(~fMinorPentatonic.size, 0.2, 0.3).sort.reverse,
+	\ringtimes, Array.exprand(~fMinorPentatonic.size, 0.6, 2).sort.reverse,
+	\freqscale, 1.0, \freqoffset, 0.0, \decayscale, 0.01,
+	\atk, 2.5, \sus, 30.0, \rel, 5.0,
+	\amp, 0.6
+]);
+)
+
+x.set(\decayscale, 5.0, \decayscalelag, 30.0, \decayscalecurve, 4.0);
+
+
+// slowly adding more and more frequencies to the resonator bank
+// additional tweaks to other parameters based on above experimentation
+(
+var p1, klankfreqs = ~fMinorPentatonic;
+var counter = 0, maxEvents = 150;
+p1 = Pbind(
+	\instrument, \sampleKlank,
+	\numevents, Pseq([0], maxEvents),
+	#[\buf, \spos], Pfunc({
+		var buf = ~buf.choose;
+		[buf, rrand(0, buf.numFrames - 1)];
+	}),
+	\rate, Pgauss(0.0, 3.0),
+	#[\klankfreqs, \klankamps, \ringtimes], Pfunc({
+		var selectedPitches;
+		counter = counter + 1;
+		counter.postln;
+		selectedPitches = klankfreqs.scramble.at(Array.series(min(ceil(counter / 5), 25)));
+		selectedPitches.postln;
+		[
+			[selectedPitches.sort.reverse],
+			[Array.exprand(selectedPitches.size, 0.2, 0.3).sort.reverse],
+			[Array.exprand(selectedPitches.size, 0.6, 2).sort.reverse]
+		];
+	}),
+	\freqscale, Pwrand([2/3, 1.0, 1.5, 2.0], [0.05, 0.7, 0.2, 0.05], inf),
+	\decayscale, Prand([Phprand(0.5, 2.5), Pmeanrand(2.5, 7.5), Plprand(7.5, 10.0)], inf),
+	\atk, Pexprand(2.5, 10),
+	\sus, Pexprand(5.0, 10),
+	\rel, Pexprand(2.5, 5),
+	\dur, 2.5,
+	\pan, Pwhite(-0.5, 0.5),
+	\amp, Pwhite(0.4, 0.55),
 );
 
 ~stream = p1.play;
