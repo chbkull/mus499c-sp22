@@ -14,6 +14,66 @@ audiopath = PathName(thisProcess.nowExecutingPath).parentPath ++ "../SoundLibrar
 x = ~buf[2].play;
 x.free;
 
+// Week of 2/17 -------------------------------------------------------------------------------------------------------------------------------
+// CK: another oddity of DynKlank- seems to be expecting at least an array of size 2 or more otherwise it gets confused when it tries to call 'sum'.
+
+(
+SynthDef.new(\sampleKlank, {
+	var buf = \buf.kr(0), rate = \rate.kr(1), spos = \spos.kr(0);
+	var klankfreqs = \klankfreqs.kr(0!25), klankamps = \klankamps.kr(0!25), ringtimes = \ringtimes.kr(0!25);
+	var freqscale = \freqscale.kr(1.0), freqoffset = \freqoffset.kr(0.0), decayscale = \decayscale.kr(1.0);
+	var atk = \atk.kr(0.1), sus = \sus.kr(1.0), rel = \rel.kr(0.1);
+	var pan = \pan.kr(0), amp = \amp.kr(1.0), out = \out.kr(0);
+	var sig, env;
+	sig = DynKlank.ar(
+		`[klankfreqs, klankamps, ringtimes],
+		PlayBuf.ar(2, buf, BufRateScale.ir(buf) * rate, startPos: spos) * 0.01,
+		freqscale.value,
+		freqoffset,
+		decayscale
+	);
+	env = EnvGen.ar(
+		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
+		doneAction:2
+	);
+	sig = sig * env;
+	sig = Balance2.ar(sig[0], sig[1], pan, amp);
+	Out.ar(out, sig);
+}).add;
+)
+
+x = Synth(\sampleKlank, [\buf, ~buf[0], \klankfreqs, #[440], \klankamps, #[0.2], \ringtimes, #[0.6], \atk, 1, \sus, 5, \rel, 1, \amp, 0.5]);
+x.free;
+
+(
+var p1;
+var fMinorPentatonic = Scale.minorPentatonic.degrees +.x [41, 53, 65, 77, 89];
+p1 = Pbind(
+	\instrument, \sampleKlank,
+	#[\buf, \spos], Pfunc({
+		var buf = ~buf.choose;
+		[buf, rrand(0, buf.numFrames - 1)];
+	}),
+	\rate, Pgauss(0.0, 3.0),
+	\klankfreqs, [fMinorPentatonic.midicps.sort.reverse],
+	\klankamps, [Array.exprand(fMinorPentatonic.size, 0.2, 0.3).sort.reverse],
+	\ringtimes, [Array.exprand(fMinorPentatonic.size, 0.6, 2).sort.reverse],
+	\freqscale, Pwrand([1.0, 1.5], [0.8, 0.2], inf),
+	\decayscale, Pmeanrand(0.5, 1.5),
+	\atk, Pexprand(2.5, 10),
+	\sus, Pexprand(5.0, 10),
+	\rel, Pexprand(1.0, 5),
+	\dur, 2.5,
+	\pan, Pwhite(-0.5, 0.5),
+	\amp, 0.6,
+);
+
+~stream = p1.play;
+)
+
+~stream.stop;
+
+
 // Week of 2/10 -------------------------------------------------------------------------------------------------------------------------------
 // CK: I ran into a lot of issues trying to get DynKlank to work with arguments inside of a SynthDef
 // Planning on bringing it to class today to try and troubleshoot, see if this is even possible or if there are any workarounds
@@ -84,7 +144,7 @@ p1 = Pbind(
 ~stream = p1.play;
 )
 
-~stream.stop(5);
+~stream.stop;
 
 
 // Week of 2/3 --------------------------------------------------------------------------------------------------------------
