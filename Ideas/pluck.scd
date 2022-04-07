@@ -11,10 +11,11 @@ s.waitForBoot({
 		var sig;
 		sig = Pluck.ar(
 			WhiteNoise.ar(0.1!2),
-			Impulse.kr(\taps.kr(0)),
+			Dust.kr(\taps.kr(0)),
 			freq.reciprocal,
 			freq.reciprocal,
-			2.0,
+			\decaytime.kr(1.0),
+			\coef.kr(0.5),
 		);
 		sig = RLPF.ar(sig, \lpf.kr(20000), 1.0);
 		sig = RHPF.ar(sig, \hpf.kr(20), 1.0);
@@ -66,21 +67,22 @@ s.waitForBoot({
 });
 )
 
-x = Synth(\plucky);
+x = Synth(\plucky, [\coef, 0.25]);
 
 (
 Pbindef(\leadplucks,
 	\instrument, \plucky,
 	\type, Pwrand([\note, \rest], [0.25, 0.75], inf),
-	\midinote, Pfunc({ Array.fill(8, { rrand(60, 72) }).nearestInScale(Scale.minorPentatonic.degrees) }),
+	\midinote, Pfunc({ Array.fill(8, { rrand(60, 72) }).nearestInScale(Scale.minor.degrees) }),
 	\strum, Pwrand([2, 4, 8, 16], [2, 4, 8, 16].reciprocal.normalizeSum, inf).reciprocal,
 	\taps, 4.0,
 	\pan, Pwhite(-0.5, 0.5),
 	\atk, 0.01,
 	\rel, 0.1,
 	\dur, 0.5,
-	\amp, 2.0,
-	\out, ~bus.rev,
+	\amp, 1.5,
+	\coef, 0.9,
+	\out, 0,
 );
 
 Pbindef(\bassarp,
@@ -90,6 +92,7 @@ Pbindef(\bassarp,
 	\dur, 2.0,
 	\decay, 0.1,
 	\amp, 1.5,
+	\coef, 0.9,
 	\lpf, 1000,
 	\out, 0,
 );
@@ -104,7 +107,8 @@ Pbindef(\chordpad,
 	\rel, 2.0,
 	\lpf, 1000,
 	\dur, 7.0,
-	\amp, 0.2,
+	\amp, 0.25,
+	\coef, 0.8,
 	\out, 0,
 );
 )
