@@ -38,7 +38,7 @@ s.waitForBoot({
 		event;
 	};
 
-	b = ~makeBuffers.(PathName(thisProcess.nowExecutingPath).parentPath ++ "../SoundLibrary", ())
+	b = ~makeBuffers.(PathName(thisProcess.nowExecutingPath).parentPath ++ "../SoundLibrary", ());
 
 	Pbindef.clear;
 });
