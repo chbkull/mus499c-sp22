@@ -1,9 +1,19 @@
+SynthDef.new(\master, {
+	var sig;
+	sig = In.ar(\in.ar(nil), 2);
+	sig = LPF.ar(sig, \lpf.kr(20000));
+	sig = HPF.ar(sig, \hpf.kr(20));
+	sig = Pan2.ar(sig, \pan.kr(0.0));
+	sig = sig * \amp.kr(1.0);
+	Out.ar(\out.kr(0), sig);
+}).add;
+
 SynthDef.new(\plucky, {
 	var freq = \freq.kr(440);
 	var sig;
 	sig = Pluck.ar(
 		WhiteNoise.ar(0.1!2),
-		Dust.kr(\taps.kr(0)),
+		Impulse.kr(\taps.kr(0)),
 		freq.reciprocal,
 		freq.reciprocal,
 		\decaytime.kr(1.0),
@@ -13,9 +23,9 @@ SynthDef.new(\plucky, {
 	sig = RHPF.ar(sig, \hpf.kr(20), 1.0);
 	sig = sig * Env([0, 1, 1, 0], [\atk.kr(0.01), \sus.kr(0.5), \rel.kr(0.01)], [\sine, \lin, \sine]).ar(doneAction: Done.freeSelf);
 	sig = Balance2.ar(sig[0], sig[1], \pan.kr(0));
-	sig = sig * \amp.kr(1.0);
 
-	Out.ar(\out.ar(0), sig);
+	Out.ar(\out.ar(0), sig * \amp.kr(1.0));
+	Out.ar(\auxout.ar(nil), sig * \auxamp.kr(0.0));
 }).add;
 
 SynthDef.new(\rain, {
@@ -104,6 +114,26 @@ SynthDef.new(\sampleRingz, {
 	var pan = \pan.kr(0), amp = \amp.kr(1.0), out = \out.kr(0);
 	var sig, env;
 	sig = Ringz.ar(
+		PlayBuf.ar(1, buf, BufRateScale.ir(buf) * rate, startPos: spos) * 0.005,
+		freq * freqscale + freqoffset,
+		ringtime * VarLag.kr(decayscale, \decayscalelag.kr(1.0), \decayscalecurve.kr(0)),
+		bankamp
+	);
+	env = Env.linen(atk, sus, rel).ar(Done.freeSelf);
+	sig = sig * env;
+	sig = Pan2.ar(sig, pan, amp);
+	sig = sig * (44100 / SampleRate.ir); // See Ringz's documentation, but amplitude is dependent on sample rate
+	Out.ar(out, sig);
+}).add;
+
+SynthDef.new(\sampleRingz2, {
+	var buf = \buf.kr(0), rate = \rate.kr(1), spos = \spos.kr(0);
+	var freq = \freq.kr(440), bankamp = \bankamp.kr(0.1), ringtime = \ringtime.kr(0.5);
+	var freqscale = \freqscale.kr(1.0, \freqscalelag.kr(1.0)), freqoffset = \freqoffset.kr(0.0, \freqoffsetlag.kr(1.0)), decayscale = \decayscale.kr(1.0);
+	var atk = \atk.kr(0.1), sus = \sus.kr(1.0), rel = \rel.kr(0.1);
+	var pan = \pan.kr(0), amp = \amp.kr(1.0), out = \out.kr(0);
+	var sig, env;
+	sig = Ringz.ar(
 		PlayBuf.ar(2, buf, BufRateScale.ir(buf) * rate, startPos: spos) * 0.005,
 		freq * freqscale + freqoffset,
 		ringtime * VarLag.kr(decayscale, \decayscalelag.kr(1.0), \decayscalecurve.kr(0)),
@@ -118,7 +148,7 @@ SynthDef.new(\sampleRingz, {
 
 SynthDef.new(\sampler, {
 	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
-	lpf=20000, hpf=20, pan=0, amp=1, out=0;
+	lpf=20000, hpf=20, pan=0, amp=1, out=0, auxamp=0, auxout=nil;
 	var sig, env;
 	sig = PlayBuf.ar(
 		1, buf, BufRateScale.ir(buf) * rate,
@@ -132,13 +162,14 @@ SynthDef.new(\sampler, {
 		doneAction:2
 	);
 	sig = sig * env;
-	sig = Pan2.ar(sig, pan, amp);
-	Out.ar(out, sig);
+	sig = Pan2.ar(sig, pan);
+	Out.ar(out, sig * amp);
+	Out.ar(auxout, sig * auxamp);
 }).add;
 
 SynthDef.new(\sampler2, {
 	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
-	lpf=20000, hpf=20, pan=0, amp=1, out=0, auxamp=1, auxout=nil;
+	lpf=20000, hpf=20, pan=0, amp=1, out=0, auxamp=0, auxout=nil;
 	var sig, env;
 	sig = PlayBuf.ar(
 		2, buf, BufRateScale.ir(buf) * rate,
