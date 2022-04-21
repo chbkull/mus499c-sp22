@@ -1,6 +1,5 @@
 (
 s.waitForBoot({
-	s.options.memSize = 2**18;
 	"synths.scd".loadRelative;
 
 	Buffer.freeAll;
@@ -254,7 +253,7 @@ Pbindef(\thunderbeads,
 	\pan, Pwhite(-0.25, 0.25),
 	\dur, Pseq([Pwhite(4.0, 8.0, 10), Pwhite(2.5, 5.0, 5), Pwhite(1.5, 2.5, inf)]),
 	\amp, 0.8,
-	\out, ~bus.master
+	\out, ~bus.rev
 );
 
 Pgeom(10, 1.1, 30).asStream.nextN(30);

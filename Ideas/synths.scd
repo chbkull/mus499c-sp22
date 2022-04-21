@@ -189,6 +189,7 @@ SynthDef.new(\sampler2, {
 	Out.ar(auxout, sig * auxamp);
 }).add;
 
+// Modification of Prof. Fieldsteel's suggested code for curtain beads -> thunder
 SynthDef.new(\thunderbeads, {
 	var sig, rate, env;
 	var buf = \buf.kr(0);
@@ -202,7 +203,6 @@ SynthDef.new(\thunderbeads, {
 	sig = BLowShelf.ar(sig, 60, 0.7, 8);
 	sig = Splay.ar(sig) * env;
 	sig = LeakDC.ar(sig);
-	sig = sig + LPF.ar(GVerb.ar(sig, 299, 4), 1000, 0.4);
 	sig = Pan2.ar(sig, \pan.kr(0));
 	sig = sig * \amp.kr(1.0);
 	Out.ar(\out.kr(0), sig)
