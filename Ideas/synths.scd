@@ -4,7 +4,7 @@ SynthDef.new(\master, {
 	sig = LPF.ar(sig, \lpf.kr(20000));
 	sig = HPF.ar(sig, \hpf.kr(20));
 	sig = Pan2.ar(sig, \pan.kr(0.0));
-	sig = sig * \amp.kr(1.0);
+	sig = sig * \amp.kr(1.0, 0.5);
 	sig = Limiter.ar(sig);
 	Out.ar(\out.kr(0), sig);
 }).add;
@@ -207,3 +207,17 @@ SynthDef.new(\thunderbeads, {
 	sig = sig * \amp.kr(1.0);
 	Out.ar(\out.kr(0), sig)
 }).add;
+
+(
+SynthDef(\wind, {
+	var sig, env;
+	sig = RLPF.ar(WhiteNoise.ar(1!2),
+		LFNoise1.kr(\freqmod.kr(0.1), 1000, 1100),
+		LFNoise1.kr(\rqmod.kr(0.4), 0.45, 0.55),
+		0.1
+	);
+	sig = sig * Env([0, 1, 1, 0], [\atk.kr(0.1), \sus.kr(1.0), \rel.kr(0.11)]).ar(doneAction: Done.freeSelf);
+	sig = sig * \amp.kr(1.0);
+	Out.ar(\out.kr(0), sig)
+}).add;
+)

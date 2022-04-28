@@ -256,11 +256,9 @@ Pbindef(\thunderbeads,
 	\out, ~bus.rev
 );
 
-Pgeom(10, 1.1, 30).asStream.nextN(30);
-
 Pbindef(\intensepad,
 	\instrument, \plucky,
-	\midinote, Pfunc({(rrand(36, 48) +.x #[-12, 0, 5, 7, 10, 12]).nearestInScale(Scale.minor.degrees).scramble.at((0..rrand(1, 5))) ++ Array.fill(rrand(2, 5), { rrand(36, 60) })}),
+	\midinote, Pfunc({(rrand(36, 48) +.x #[-12, 0, 5, 7, 10, 12]).nearestInScale(Scale.minor.degrees).scramble.at((0..rrand(3, 5))) ++ Array.fill(rrand(3, 5), { rrand(36, 60) })}),
 	\taps, Pgeom(10, 1.1, 30),
 	\pan, Pwhite(-0.25, 0.25, inf),
 	\atk, 6.0,
@@ -269,7 +267,7 @@ Pbindef(\intensepad,
 	\hpf, 200,
 	\lpf, Env([1000, 5000, 10000], [60, 60], [4, 0]).asPseg,
 	\dur, Pwhite(3.5, 4.5),
-	\amp, Env([0.5, 0.9, 1.1], [60, 60], [1, 0]).asPseg,
+	\amp, Env([0.5, 0.9, 1.3], [60, 60], [1, 1]).asPseg,
 	\coef, 0.8,
 	\out, ~bus.rev
 );
@@ -282,9 +280,92 @@ Pbindef.new(\heavythunder,
 	\atk, 0.01,
 	\sus, 5,
 	\rel, 5.0,
-	\amp, 0.5,
+	\amp, Pseq([Env([0.3, 0.6], [84],).asPseg, Pseq([0.6], inf)]),
 	\pan, Pwhite(-0.1, 0.1),
 	\out, ~bus.rev,
+);
+
+Pbindef.new(\wind,
+	\instrument, \wind,
+	\filtmod, Pexprand(0.05, 0.5),
+	\rqmod, Pexprand(0.5, 0.05),
+	\dur, Pwhite(2.0, 8.0),
+	\atk, Pmeanrand(3.0, 7.0),
+	\sus, Pmeanrand(3.0, 7.0),
+	\rel, Pmeanrand(3.0, 7.0),
+	\amp, Pseq([Env([0.01, 0.2, 0.05], [60, 30]).asPseg, Pseq([0.05], inf)]),
+	\pan, Pwhite(-0.75, 0.75),
+	\out, ~bus.rev,
+);
+
+~scale = Scale.minor;
+~buildEvents = 20;
+~upcounter = 0;
+~buildInsertRate = 2;
+~maxResonators = ~buildEvents * ~buildInsertRate;
+
+~ringzBuild = Pbind(
+	\instrument, \sampleRingz,
+	\numevents, Pseq([0], ~buildEvents),
+	#[\buf, \spos], Pfunc({
+		var buf = (b.at(\Rain99Sounds) ++ b.at(\HeavyThunder99Sounds) ++ b.at(\Cafe)).choose;
+		[buf, rrand(0, buf.numFrames - 1)];
+	}),
+	\rate, Pgauss(0.0, 3.0),
+	#[\degree, \octave, \bankamp, \ringtime], Pfunc({
+		var selectedPitches;
+		~upcounter = ~upcounter + 1;
+		selectedPitches = ~scale.at(Array.rand(~maxResonators, 0, ~scale.size - 1)).at(Array.series(min(ceil(~upcounter * ~buildInsertRate), ~maxResonators)));
+		[
+			selectedPitches.sort.reverse,
+			[3, 4, 5, 6, 7].at(Array.rand(selectedPitches.size, 0, 4)), // randomize octave
+			Array.exprand(selectedPitches.size, 0.2, 0.3).sort.reverse,
+			Array.exprand(selectedPitches.size, 0.6, 2).sort.reverse
+		];
+	}),
+	\freqscale, Pwrand([2/3, 1.0, 1.5, 2.0], [0.05, 0.7, 0.2, 0.05], inf),
+	\decayscale, Prand([Phprand(0.5, 2.5), Pmeanrand(2.5, 7.5), Plprand(7.5, 10.0)], inf),
+	\atk, Pexprand(2.5, 10),
+	\sus, Pexprand(5.0, 10),
+	\rel, Pexprand(2.5, 5),
+	\dur, 3.0,
+	\pan, Pwhite(-0.5, 0.5),
+	\amp, Pwhite(0.15, 0.25),
+	\out, ~bus.rev
+);
+
+~descendEvents = 20;
+~downcounter = ~descendEvents;
+~descendRemoveRate = 2;
+
+~ringzDescend = Pbind(
+	\instrument, \sampleRingz,
+	\numevents, Pseq([0], ~descendEvents),
+	#[\buf, \spos], Pfunc({
+		var buf = (b.at(\Rain99Sounds) ++ b.at(\HeavyThunder99Sounds) ++ b.at(\Cafe)).choose;
+		[buf, rrand(0, buf.numFrames - 1)];
+	}),
+	\rate, Pgauss(0.0, 3.0),
+	#[\degree, \octave, \bankamp, \ringtime], Pfunc({
+		var selectedPitches;
+		~downcounter = ~downcounter - 1;
+		selectedPitches = ~scale.at(Array.rand(~maxResonators, 0, ~scale.size - 1)).at(Array.series(max(ceil(~downcounter * ~descendRemoveRate), 1)));
+		[
+			selectedPitches.sort.reverse,
+			[3, 4, 5, 6, 7].at(Array.rand(selectedPitches.size, 0, 4)), // randomize octave
+			Array.exprand(selectedPitches.size, 0.2, 0.3).sort.reverse,
+			Array.exprand(selectedPitches.size, 0.6, 2).sort.reverse
+		];
+	}),
+	\freqscale, Pwrand([2/3, 1.0, 1.5, 2.0], [0.05, 0.7, 0.2, 0.05], inf),
+	\decayscale, Prand([Phprand(2.5, 7.5), Pmeanrand(7.5, 10.0)], inf),
+	\atk, Pexprand(2.5, 10),
+	\sus, Pexprand(5.0, 10),
+	\rel, Pexprand(2.5, 5),
+	\dur, 3.0,
+	\pan, Pwhite(-0.5, 0.5),
+	\amp, Pwhite(0.15, 0.25),
+	\out, ~bus.rev
 );
 )
 
@@ -300,8 +381,11 @@ Pbindef(\ringers).play;
 Pbindef(\thunderbeads).play;
 Pbindef(\intensepad).play;
 Pbindef(\heavythunder).play;
+Pbindef(\wind).play;
 
-// 6.5 minute sequence
+
+// ~9.5 minute sequence
+// NOTE: there is clipping in ringzDescend pattern, but it is random. See the worklog for more details.
 (
 ~rev.set(\fb, 0.1);
 Pbindef(\rain, \amp, 1.0);
@@ -380,36 +464,47 @@ r = Routine {
 	"heavy thunder".postln;
 	Pbindef(\heavythunder).play;
 
+	// 386
+	82.wait;
+	"strike!".postln;
+	Synth(\sampler, [\buf, b.at(\HeavyThunder99Sounds)[2], \atk, 0.01, \sus, 20.0, \rel, 1.0, \amp, 0.9, \out, ~bus.rev]);
+
 	// 388
-	84.wait;
-	"samplers stop".postln;
+	2.wait;
+	"typing, ringers, thunderbeads, and heavythunder stop".postln;
 	Pbindef(\typing).stop;
 	Pbindef(\ringers).stop;
 	Pbindef(\thunderbeads).stop;
 	Pbindef(\heavythunder).stop;
+
+	// 412
+	24.wait;
+	"wind".postln;
+	Pbindef(\wind).play;
+
+	// 444
+	32.wait;
+	"ringz build".postln;
+	~ringz = Pseq([~ringzBuild, ~ringzDescend]).play;
+
+	// 504
+	60.wait;
+	"ringzDescend, ringzBuild stop".postln;
+
+	// 564
+	60.wait;
+	"ringzDescend and wind stop".postln;
+	Pbindef(\wind).stop;
 }.play;
 )
 
-(
-r.stop;
-Pbindef(\rain).stop;
-Pbindef(\typing).stop;
-Pbindef(\panSizzle).stop;
-Pbindef(\ice).stop;
-Pbindef(\salt).stop;
-Pbindef(\leadplucks).stop;
-Pbindef(\chordpad).stop;
-Pbindef(\beads).stop;
-Pbindef(\ringers).stop;
-Pbindef(\thunderbeads).stop;
-Pbindef(\morpher).stop;
-)
-
-// new section for 4/21
+// 4/21 work + 4/28 work
+// NOTE: there is clipping in ringzDescend pattern, but it is random. See the worklog for more details.
 (
 ~rev.set(\fb, 0.1);
 
 r = Routine {
+	~master.set(\amp, 1.0);
 	"beads and ringers".postln;
 	Pbindef(\beads).play;
 	Pbindef(\ringers).play;
@@ -425,10 +520,29 @@ r = Routine {
 	"heavy thunder".postln;
 	Pbindef(\heavythunder).play;
 
-	84.wait;
-	"samplers stop".postln;
+	82.wait;
+	"strike!".postln;
+	Synth(\sampler, [\buf, b.at(\HeavyThunder99Sounds)[2], \atk, 0.01, \sus, 20.0, \rel, 1.0, \amp, 1.2, \out, ~bus.rev]);
+
+	2.wait;
+	"ringers, thunderbeads, and heavythunder stop".postln;
 	Pbindef(\ringers).stop;
 	Pbindef(\thunderbeads).stop;
 	Pbindef(\heavythunder).stop;
+
+	24.wait;
+	"wind".postln;
+	Pbindef(\wind).play;
+
+	32.wait;
+	"ringz build".postln;
+	~ringz = Pseq([~ringzBuild, ~ringzDescend]).play;
+
+	60.wait;
+	"ringz descend".postln;
+
+	60.wait;
+	"wind stop".postln;
+	Pbindef(\wind).stop;
 }.play;
 )
