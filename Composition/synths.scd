@@ -1,3 +1,34 @@
+SynthDef.new(\master, {
+	var sig;
+	sig = In.ar(\in.ar(nil), 2);
+	sig = LPF.ar(sig, \lpf.kr(20000));
+	sig = HPF.ar(sig, \hpf.kr(20));
+	sig = Pan2.ar(sig, \pan.kr(0.0));
+	sig = sig * \amp.kr(1.0, 0.5);
+	sig = Limiter.ar(sig);
+	Out.ar(\out.kr(0), sig);
+}).add;
+
+SynthDef.new(\plucky, {
+	var freq = \freq.kr(440);
+	var sig;
+	sig = Pluck.ar(
+		WhiteNoise.ar(0.1!2),
+		Impulse.kr(\taps.kr(0)),
+		freq.reciprocal,
+		freq.reciprocal,
+		\decaytime.kr(1.0),
+		\coef.kr(0.5),
+	);
+	sig = RLPF.ar(sig, \lpf.kr(20000), 1.0);
+	sig = RHPF.ar(sig, \hpf.kr(20), 1.0);
+	sig = sig * Env([0, 1, 1, 0], [\atk.kr(0.01), \sus.kr(0.5), \rel.kr(0.01)], [\sine, \lin, \sine]).ar(doneAction: Done.freeSelf);
+	sig = Balance2.ar(sig[0], sig[1], \pan.kr(0));
+
+	Out.ar(\out.ar(0), sig * \amp.kr(1.0));
+	Out.ar(\auxout.ar(nil), sig * \auxamp.kr(0.0));
+}).add;
+
 SynthDef.new(\rain, {
 	var lowBubble, highBubble, noise, sig;
 	lowBubble = { WhiteNoise.ar }!2;
@@ -16,6 +47,16 @@ SynthDef.new(\rain, {
 
 	sig = lowBubble * \lowBubbleAmp.kr(0.1) + highBubble * \highBubbleAmp.kr(0.02) + noise * \noiseAmp.kr(0.1);
 	Out.ar(\out.kr(0), sig);
+}).add;
+
+SynthDef.new(\raindrop, {
+	var sig, fenv, env, length = \len.ir(0.0005);
+	fenv = Env([\lo.ir(4000), \hi.ir(12000)], [length], [\crv.ir(1)]).ar;
+	env = Env([0,1,0], [0.0002, length-0.0002], [-3,-2]).ar(2);
+	sig = WhiteNoise.ar(1);
+	sig = BPF.ar(sig, fenv, 0.0001, 2/0.0001.sqrt);
+	sig = Pan2.ar(sig, \pan.ir(0), \amp.ir(0.1));
+	OffsetOut.ar(\out.ir(0), sig);
 }).add;
 
 SynthDef.new(\rainmaker, {
@@ -46,61 +87,47 @@ SynthDef.new(\rainmaker, {
 	Out.ar(auxout, sig * auxamp);
 }).add;
 
-SynthDef.new(\raindrop, {
-	var sig;
-	sig = { WhiteNoise.ar }!2;
-	sig = RLPF.ar(sig, 100 + 1000 * Env([0, 1, 0.4, 1, 0], [0.09, 0.01, 0.09, 0.01], [0, 0, 2, 0]).ar, 0.005);
-	sig = HPF.ar(sig, 100);
-	sig = HPF.ar(sig, 100);
-	sig = sig * Env([0, 1, 0], [0.01, 0.2], [4, 2]).ar(doneAction: Done.freeSelf);
-	sig = sig * 0.15;
-	sig = sig * \amp.kr(1.0);
-	sig = Balance2.ar(sig[0], sig[1], \pan.ar(0));
-	Out.ar(\out.kr(0), sig);
-}).add;
-
-SynthDef.new(\sampler, {
-	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
-	lp=20000, hp=20, pan=0, amp=1, out=0;
-	var sig, env;
-	sig = PlayBuf.ar(
-		1, buf, BufRateScale.ir(buf) * rate,
-		startPos: spos, loop: loop
-	);
-	sig = LPF.ar(sig, lp);
-	sig = HPF.ar(sig, hp);
-
-	env = EnvGen.ar(
-		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
-		doneAction:2
-	);
-	sig = sig * env;
-	sig = Pan2.ar(sig, pan, amp);
+// reverb from Prof. Fieldsteel
+SynthDef(\reverb, {
+	arg in=0, out=0, mix=1, fb=0.8;
+	var sig, wet;
+	sig = In.ar(in, 2);
+	wet = LocalIn.ar(2) + sig; //read from local bus
+	wet = DelayN.ar(wet, 0.03, 0.03);
+	5.do({ |n|
+		var del, coef, dec;
+		del = {Rand(0.1/(n+2), 0.1/(n+1))}!2;
+		coef = Rand(0.6, 0.75);
+		dec = del / (log10(coef)/3.neg);
+		wet = AllpassN.ar(wet, 0.1, del, dec);
+	});
+	LocalOut.ar(wet * fb); //apply feedback coefficient write to local bus
+	wet = LPF.ar(wet, \lpf.kr(20000));
+	sig = sig.blend(wet, mix.varlag(0.3));
 	Out.ar(out, sig);
 }).add;
 
-SynthDef.new(\sampler2, {
-	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
-	lp=20000, hp=20, pan=0, amp=1, out=0, auxamp=1, auxout=nil;
+SynthDef.new(\sampleRingz, {
+	var buf = \buf.kr(0), rate = \rate.kr(1), spos = \spos.kr(0);
+	var freq = \freq.kr(440), bankamp = \bankamp.kr(0.1), ringtime = \ringtime.kr(0.5);
+	var freqscale = \freqscale.kr(1.0, \freqscalelag.kr(1.0)), freqoffset = \freqoffset.kr(0.0, \freqoffsetlag.kr(1.0)), decayscale = \decayscale.kr(1.0);
+	var atk = \atk.kr(0.1), sus = \sus.kr(1.0), rel = \rel.kr(0.1);
+	var pan = \pan.kr(0), amp = \amp.kr(1.0), out = \out.kr(0);
 	var sig, env;
-	sig = PlayBuf.ar(
-		2, buf, BufRateScale.ir(buf) * rate,
-		startPos: spos, loop: loop
+	sig = Ringz.ar(
+		PlayBuf.ar(1, buf, BufRateScale.ir(buf) * rate, startPos: spos) * 0.005,
+		freq * freqscale + freqoffset,
+		ringtime * VarLag.kr(decayscale, \decayscalelag.kr(1.0), \decayscalecurve.kr(0)),
+		bankamp
 	);
-	sig = LPF.ar(sig, lp);
-	sig = HPF.ar(sig, hp);
-
-	env = EnvGen.ar(
-		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
-		doneAction:2
-	);
+	env = Env.linen(atk, sus, rel).ar(Done.freeSelf);
 	sig = sig * env;
-	sig = Balance2.ar(sig[0], sig[1], pan);
-	Out.ar(out, sig * amp);
-	Out.ar(auxout, sig * auxamp);
+	sig = Pan2.ar(sig, pan, amp);
+	sig = sig * (44100 / SampleRate.ir); // See Ringz's documentation, but amplitude is dependent on sample rate
+	Out.ar(out, sig);
 }).add;
 
-SynthDef.new(\sampleRingz, {
+SynthDef.new(\sampleRingz2, {
 	var buf = \buf.kr(0), rate = \rate.kr(1), spos = \spos.kr(0);
 	var freq = \freq.kr(440), bankamp = \bankamp.kr(0.1), ringtime = \ringtime.kr(0.5);
 	var freqscale = \freqscale.kr(1.0, \freqscalelag.kr(1.0)), freqoffset = \freqoffset.kr(0.0, \freqoffsetlag.kr(1.0)), decayscale = \decayscale.kr(1.0);
@@ -119,3 +146,78 @@ SynthDef.new(\sampleRingz, {
 	sig = sig * (44100 / SampleRate.ir); // See Ringz's documentation, but amplitude is dependent on sample rate
 	Out.ar(out, sig);
 }).add;
+
+SynthDef.new(\sampler, {
+	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
+	lpf=20000, hpf=20, pan=0, amp=1, out=0, auxamp=0, auxout=nil;
+	var sig, env;
+	sig = PlayBuf.ar(
+		1, buf, BufRateScale.ir(buf) * rate,
+		startPos: spos, loop: loop, doneAction: Done.freeSelf
+	);
+	sig = LPF.ar(sig, lpf);
+	sig = HPF.ar(sig, hpf);
+
+	env = EnvGen.ar(
+		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
+		doneAction:2
+	);
+	sig = sig * env;
+	sig = Pan2.ar(sig, pan);
+	Out.ar(out, sig * amp);
+	Out.ar(auxout, sig * auxamp);
+}).add;
+
+SynthDef.new(\sampler2, {
+	arg buf=0, rate=1, spos=0, loop=0, atk=0.01, sus=1, rel=0.01,
+	lpf=20000, hpf=20, pan=0, amp=1, out=0, auxamp=0, auxout=nil;
+	var sig, env;
+	sig = PlayBuf.ar(
+		2, buf, BufRateScale.ir(buf) * rate,
+		startPos: spos, loop: loop
+	);
+	sig = LPF.ar(sig, lpf);
+	sig = HPF.ar(sig, hpf);
+
+	env = EnvGen.ar(
+		Env.new([0,1,1,0],[atk,sus,rel],[1,0,-1]),
+		doneAction:2
+	);
+	sig = sig * env;
+	sig = Balance2.ar(sig[0], sig[1], pan);
+	Out.ar(out, sig * amp);
+	Out.ar(auxout, sig * auxamp);
+}).add;
+
+// Modification of Prof. Fieldsteel's suggested code for curtain beads -> thunder
+SynthDef.new(\thunderbeads, {
+	var sig, rate, env;
+	var buf = \buf.kr(0);
+	rate = Array.exprand(4,0.02,0.03);
+	env = Env([1,1,0],[0.95,0.05] * (BufDur.ir(buf) / (rate.sort[0]))).kr(2);
+	sig = PlayBuf.ar(
+		1, buf, rate,
+		startPos: 3000,
+	) * 0.2;
+	sig = RLPF.ar(sig, Array.exprand(4,80,240), 0.5, 1);
+	sig = BLowShelf.ar(sig, 60, 0.7, 8);
+	sig = Splay.ar(sig) * env;
+	sig = LeakDC.ar(sig);
+	sig = Pan2.ar(sig, \pan.kr(0));
+	sig = sig * \amp.kr(1.0);
+	Out.ar(\out.kr(0), sig)
+}).add;
+
+(
+SynthDef(\wind, {
+	var sig, env;
+	sig = RLPF.ar(WhiteNoise.ar(1!2),
+		LFNoise1.kr(\freqmod.kr(0.1), 1000, 1100),
+		LFNoise1.kr(\rqmod.kr(0.4), 0.45, 0.55),
+		0.1
+	);
+	sig = sig * Env([0, 1, 1, 0], [\atk.kr(0.1), \sus.kr(1.0), \rel.kr(0.11)]).ar(doneAction: Done.freeSelf);
+	sig = sig * \amp.kr(1.0);
+	Out.ar(\out.kr(0), sig)
+}).add;
+)
